@@ -62,7 +62,7 @@ public class CalendarBookingClp extends BaseModelImpl<CalendarBooking>
 	}
 
 	public Serializable getPrimaryKeyObj() {
-		return new Long(_calendarBookingId);
+		return _calendarBookingId;
 	}
 
 	public void setPrimaryKeyObj(Serializable primaryKeyObj) {
@@ -883,8 +883,7 @@ public class CalendarBookingClp extends BaseModelImpl<CalendarBooking>
 			return value;
 		}
 
-		value = getTitle().toLowerCase()
-					.compareTo(calendarBooking.getTitle().toLowerCase());
+		value = getTitle().compareToIgnoreCase(calendarBooking.getTitle());
 
 		if (value != 0) {
 			return value;

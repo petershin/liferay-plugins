@@ -183,7 +183,7 @@ public class CalendarResourceModelImpl extends BaseModelImpl<CalendarResource>
 	}
 
 	public Serializable getPrimaryKeyObj() {
-		return new Long(_calendarResourceId);
+		return _calendarResourceId;
 	}
 
 	public void setPrimaryKeyObj(Serializable primaryKeyObj) {
@@ -836,8 +836,7 @@ public class CalendarResourceModelImpl extends BaseModelImpl<CalendarResource>
 	public int compareTo(CalendarResource calendarResource) {
 		int value = 0;
 
-		value = getCode().toLowerCase()
-					.compareTo(calendarResource.getCode().toLowerCase());
+		value = getCode().compareToIgnoreCase(calendarResource.getCode());
 
 		if (value != 0) {
 			return value;
