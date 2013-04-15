@@ -39,7 +39,7 @@ long[] calendarIds = StringUtil.split(SessionClicks.get(request, "otherCalendars
 for (long calendarId : calendarIds) {
 	Calendar calendar = CalendarLocalServiceUtil.fetchCalendar(calendarId);
 
-	if ((calendar != null) && (CalendarPermission.contains(permissionChecker, calendar, ActionKeys.VIEW))) {
+	if ((calendar != null) && CalendarPermission.contains(permissionChecker, calendar, ActionKeys.VIEW)) {
 		CalendarResource calendarResource = calendar.getCalendarResource();
 
 		if (calendarResource.isActive()) {
@@ -51,7 +51,13 @@ for (long calendarId : calendarIds) {
 Calendar defaultCalendar = null;
 
 if ((userCalendars != null) && (userCalendars.size() > 0)) {
-	defaultCalendar = userCalendars.get(0);
+	for (Calendar userCalendar : userCalendars) {
+		if (userCalendar.isDefaultCalendar()) {
+			defaultCalendar = userCalendar;
+
+			break;
+		}
+	}
 }
 
 JSONArray groupCalendarsJSONArray = CalendarUtil.toCalendarsJSONArray(themeDisplay, groupCalendars);
@@ -143,13 +149,20 @@ JSONArray otherCalendarsJSONArray = CalendarUtil.toCalendarsJSONArray(themeDispl
 	</c:if>
 
 	var syncCalendarsMap = function() {
-		Liferay.CalendarUtil.syncCalendarsMap(
-			<c:if test="<%= themeDisplay.isSignedIn() %>">
+		var calendarLists = [];
+
+		<c:if test="<%= themeDisplay.isSignedIn() %>">
+			calendarLists.push(
 				window.<portlet:namespace />myCalendarList,
-				window.<portlet:namespace />otherCalendarList,
-			</c:if>
-			window.<portlet:namespace />siteCalendarList
-		);
+				window.<portlet:namespace />otherCalendarList
+			);
+		</c:if>
+
+		<c:if test="<%= groupCalendarResource != null %>">
+			calendarLists.push(window.<portlet:namespace />siteCalendarList);
+		</c:if>
+
+		Liferay.CalendarUtil.syncCalendarsMap(calendarLists);
 	}
 
 	<c:if test="<%= themeDisplay.isSignedIn() %>">
@@ -206,27 +219,29 @@ JSONArray otherCalendarsJSONArray = CalendarUtil.toCalendarsJSONArray(themeDispl
 		).render();
 	</c:if>
 
-	window.<portlet:namespace />siteCalendarList = new Liferay.CalendarList(
-		{
-			after: {
-				calendarsChange: syncCalendarsMap,
-				'scheduler-calendar:visibleChange': function(event) {
-					syncCalendarsMap();
+	<c:if test="<%= groupCalendarResource != null %>">
+		window.<portlet:namespace />siteCalendarList = new Liferay.CalendarList(
+			{
+				after: {
+					calendarsChange: syncCalendarsMap,
+					'scheduler-calendar:visibleChange': function(event) {
+						syncCalendarsMap();
 
-					<portlet:namespace />refreshVisibleCalendarRenderingRules();
-				}
-			},
-			boundingBox: '#<portlet:namespace />siteCalendarList',
+						<portlet:namespace />refreshVisibleCalendarRenderingRules();
+					}
+				},
+				boundingBox: '#<portlet:namespace />siteCalendarList',
 
-			<%
-			updateCalendarsJSONArray(request, groupCalendarsJSONArray);
-			%>
+				<%
+				updateCalendarsJSONArray(request, groupCalendarsJSONArray);
+				%>
 
-			calendars: <%= groupCalendarsJSONArray %>,
-			scheduler: <portlet:namespace />scheduler,
-			simpleMenu: window.<portlet:namespace />calendarsMenu
-		}
-	).render();
+				calendars: <%= groupCalendarsJSONArray %>,
+				scheduler: <portlet:namespace />scheduler,
+				simpleMenu: window.<portlet:namespace />calendarsMenu
+			}
+		).render();
+	</c:if>
 
 	syncCalendarsMap();
 
@@ -350,7 +365,8 @@ JSONArray otherCalendarsJSONArray = CalendarUtil.toCalendarsJSONArray(themeDispl
 				}
 			},
 			date: new Date(<%= String.valueOf(date) %>),
-			locale: 'en'
+			locale: 'en',
+			'strings.first_weekday': <%= weekStartsOn %>
 		}
 	).render('#<portlet:namespace />miniCalendarContainer');
 
