@@ -39,9 +39,12 @@ import com.liferay.portal.kernel.repository.model.FileEntry;
 import com.liferay.portal.kernel.servlet.SessionErrors;
 import com.liferay.portal.kernel.upload.UploadException;
 import com.liferay.portal.kernel.upload.UploadPortletRequest;
+import com.liferay.portal.kernel.util.CharPool;
 import com.liferay.portal.kernel.util.Constants;
+import com.liferay.portal.kernel.util.FileUtil;
 import com.liferay.portal.kernel.util.GetterUtil;
 import com.liferay.portal.kernel.util.HttpUtil;
+import com.liferay.portal.kernel.util.MimeTypesUtil;
 import com.liferay.portal.kernel.util.ParamUtil;
 import com.liferay.portal.kernel.util.StreamUtil;
 import com.liferay.portal.kernel.util.StringUtil;
@@ -60,6 +63,7 @@ import com.liferay.portlet.documentlibrary.FileSizeException;
 import com.liferay.portlet.documentlibrary.NoSuchFileException;
 import com.liferay.util.bridges.mvc.MVCPortlet;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -288,7 +292,15 @@ public class AdminPortlet extends MVCPortlet {
 			String resourceID = resourceRequest.getResourceID();
 
 			if (resourceID.equals("attachment")) {
-				serveAttachment(resourceRequest, resourceResponse);
+				long fileEntryId = ParamUtil.getLong(
+					resourceRequest, "fileEntryId");
+
+				if (fileEntryId == 0) {
+					serveTempAttachment(resourceRequest, resourceResponse);
+				}
+				else {
+					serveAttachment(resourceRequest, resourceResponse);
+				}
 			}
 		}
 		catch (IOException ioe) {
@@ -300,6 +312,33 @@ public class AdminPortlet extends MVCPortlet {
 		catch (Exception e) {
 			throw new PortletException(e);
 		}
+	}
+
+	public void serveTempAttachment(
+			ResourceRequest resourceRequest, ResourceResponse resourceResponse)
+		throws Exception {
+
+		String portletId = PortalUtil.getPortletId(resourceRequest);
+
+		long resourcePrimKey = ParamUtil.getLong(
+			resourceRequest, "resourcePrimKey");
+
+		String fileName = ParamUtil.getString(resourceRequest, "fileName");
+
+		ServiceContext serviceContext = ServiceContextFactory.getInstance(
+			KBArticle.class.getName(), resourceRequest);
+
+		File file = KBArticleServiceUtil.getAttachmentFile(
+			portletId, resourcePrimKey, fileName, serviceContext);
+
+		String attachmentName = fileName.substring(
+			fileName.lastIndexOf(CharPool.SLASH) + 1);
+
+		String contentType = MimeTypesUtil.getContentType(file, attachmentName);
+
+		PortletResponseUtil.sendFile(
+			resourceRequest, resourceResponse, attachmentName,
+			FileUtil.getBytes(file), contentType);
 	}
 
 	public void subscribeGroupKBArticles(
