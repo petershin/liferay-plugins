@@ -17,6 +17,7 @@ package com.liferay.knowledgebase.service.impl;
 import com.liferay.knowledgebase.KBArticleContentException;
 import com.liferay.knowledgebase.KBArticlePriorityException;
 import com.liferay.knowledgebase.KBArticleTitleException;
+import com.liferay.knowledgebase.NoSuchArticleException;
 import com.liferay.knowledgebase.admin.social.AdminActivityKeys;
 import com.liferay.knowledgebase.admin.util.AdminSubscriptionSender;
 import com.liferay.knowledgebase.admin.util.AdminUtil;
@@ -54,8 +55,10 @@ import com.liferay.portal.kernel.systemevent.SystemEventHierarchyEntryThreadLoca
 import com.liferay.portal.kernel.util.ArrayUtil;
 import com.liferay.portal.kernel.util.ContentTypes;
 import com.liferay.portal.kernel.util.FileUtil;
+import com.liferay.portal.kernel.util.FriendlyURLNormalizerUtil;
 import com.liferay.portal.kernel.util.ListUtil;
 import com.liferay.portal.kernel.util.OrderByComparator;
+import com.liferay.portal.kernel.util.ParamUtil;
 import com.liferay.portal.kernel.util.StreamUtil;
 import com.liferay.portal.kernel.util.StringBundler;
 import com.liferay.portal.kernel.util.StringPool;
@@ -66,6 +69,7 @@ import com.liferay.portal.kernel.workflow.WorkflowConstants;
 import com.liferay.portal.kernel.workflow.WorkflowHandlerRegistryUtil;
 import com.liferay.portal.model.CompanyConstants;
 import com.liferay.portal.model.Group;
+import com.liferay.portal.model.ModelHintsUtil;
 import com.liferay.portal.model.ResourceConstants;
 import com.liferay.portal.model.Subscription;
 import com.liferay.portal.model.Ticket;
@@ -79,6 +83,7 @@ import com.liferay.portlet.documentlibrary.DuplicateDirectoryException;
 import com.liferay.portlet.documentlibrary.FileNameException;
 import com.liferay.portlet.documentlibrary.NoSuchDirectoryException;
 import com.liferay.portlet.documentlibrary.store.DLStoreUtil;
+import com.liferay.portlet.journal.util.comparator.ArticleVersionComparator;
 
 import java.io.File;
 import java.io.InputStream;
@@ -89,6 +94,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import javax.portlet.PortletPreferences;
 
@@ -162,6 +168,8 @@ public class KBArticleLocalServiceImpl extends KBArticleLocalServiceBaseImpl {
 		kbArticle.setParentResourcePrimKey(parentResourcePrimKey);
 		kbArticle.setVersion(KBArticleConstants.DEFAULT_VERSION);
 		kbArticle.setTitle(title);
+		kbArticle.setUrlTitle(
+			getUniqueUrlTitle(kbArticleId, title, null, serviceContext));
 		kbArticle.setContent(content);
 		kbArticle.setDescription(description);
 		kbArticle.setPriority(priority);
@@ -515,6 +523,23 @@ public class KBArticleLocalServiceImpl extends KBArticleLocalServiceBaseImpl {
 		return Collections.unmodifiableList(kbArticles);
 	}
 
+	@Override
+	public KBArticle getKBArticleByUrlTitle(long groupId, String urlTitle)
+		throws PortalException, SystemException {
+
+		// Get the latest KB article that is approved, if none are approved, get
+		// the latest unapproved KB article
+
+		try {
+			return getLatestKBArticleByUrlTitle(
+				groupId, urlTitle, WorkflowConstants.STATUS_APPROVED);
+		}
+		catch (NoSuchArticleException nsae) {
+			return getLatestKBArticleByUrlTitle(
+				groupId, urlTitle, WorkflowConstants.STATUS_PENDING);
+		}
+	}
+
 	public List<KBArticle> getKBArticles(
 			long[] resourcePrimKeys, int status,
 			OrderByComparator orderByComparator)
@@ -587,6 +612,33 @@ public class KBArticleLocalServiceImpl extends KBArticleLocalServiceBaseImpl {
 
 		return kbArticlePersistence.findByR_S_First(
 			resourcePrimKey, status, new KBArticleVersionComparator());
+	}
+
+	@Override
+	public KBArticle getLatestKBArticleByUrlTitle(
+			long groupId, String urlTitle, int status)
+		throws PortalException, SystemException {
+
+		List<KBArticle> kbArticles = null;
+
+		OrderByComparator orderByComparator = new ArticleVersionComparator();
+
+		if (status == WorkflowConstants.STATUS_ANY) {
+			kbArticles = kbArticlePersistence.findByG_UT(
+				groupId, urlTitle, 0, 1, orderByComparator);
+		}
+		else {
+			kbArticles = kbArticlePersistence.findByG_UT_ST(
+				groupId, urlTitle, status, 0, 1, orderByComparator);
+		}
+
+		if (kbArticles.isEmpty()) {
+			throw new NoSuchArticleException(
+				"No KBArticle exists with the key {groupId=" + groupId +
+					", urlTitle=" + urlTitle + ", status=" + status + "}");
+		}
+
+		return kbArticles.get(0);
 	}
 
 	public List<KBArticle> getSectionsKBArticles(
@@ -861,6 +913,10 @@ public class KBArticleLocalServiceImpl extends KBArticleLocalServiceBaseImpl {
 
 		kbArticle.setModifiedDate(serviceContext.getModifiedDate(null));
 		kbArticle.setTitle(title);
+		kbArticle.setUrlTitle(
+			getUniqueUrlTitle(
+				kbArticle.getKbArticleId(), title, oldKBArticle.getUrlTitle(),
+				serviceContext));
 		kbArticle.setContent(content);
 		kbArticle.setDescription(description);
 		kbArticle.setSections(
@@ -1420,6 +1476,66 @@ public class KBArticleLocalServiceImpl extends KBArticleLocalServiceBaseImpl {
 		return new Date(System.currentTimeMillis() + _TICKET_EXPIRATION);
 	}
 
+	protected String getUniqueUrlTitle(
+			long kbArticleId, String title, String oldUrlTitle,
+			ServiceContext serviceContext)
+		throws PortalException, SystemException {
+
+		String serviceContextUrlTitle = ParamUtil.getString(
+			serviceContext, "urlTitle");
+
+		String urlTitle = null;
+
+		if (Validator.isNotNull(serviceContextUrlTitle)) {
+			urlTitle = getUrlTitle(kbArticleId, serviceContextUrlTitle);
+		}
+		else if (Validator.isNotNull(oldUrlTitle)) {
+			return oldUrlTitle;
+		}
+		else {
+			urlTitle = getUrlTitle(kbArticleId, title);
+		}
+
+		KBArticle urlTitleArticle = null;
+
+		try {
+			urlTitleArticle = getKBArticleByUrlTitle(
+				serviceContext.getScopeGroupId(), urlTitle);
+		}
+		catch (NoSuchArticleException nsae) {
+		}
+
+		if ((urlTitleArticle != null) &&
+			!Validator.equals(
+				urlTitleArticle.getKbArticleId(), kbArticleId)) {
+
+			urlTitle = getUrlTitle(kbArticleId, title);
+		}
+
+		return urlTitle;
+	}
+
+	protected String getUrlTitle(long id, String title) {
+		if (title == null) {
+			return String.valueOf(id);
+		}
+
+		title = StringUtil.toLowerCase(title.trim());
+
+		if (Validator.isNull(title) || Validator.isNumber(title) ||
+			title.equals("rss")) {
+
+			title = String.valueOf(id);
+		}
+		else {
+			title = FriendlyURLNormalizerUtil.normalize(
+				title, _friendlyURLPattern);
+		}
+
+		return ModelHintsUtil.trimString(
+			KBArticle.class.getName(), "urlTitle", title);
+	}
+
 	protected boolean isValidDirName(String dirName) throws SystemException {
 		String key = StringUtil.extractLast(dirName, StringPool.SLASH);
 
@@ -1659,4 +1775,5 @@ public class KBArticleLocalServiceImpl extends KBArticleLocalServiceBaseImpl {
 	private static Log _log = LogFactoryUtil.getLog(
 		KBArticleLocalServiceImpl.class);
 
+	private static Pattern _friendlyURLPattern = Pattern.compile("[^a-z0-9_-]");
 }
