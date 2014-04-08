@@ -478,6 +478,13 @@ public class KBArticleLocalServiceUtil {
 			orderByComparator);
 	}
 
+	public static com.liferay.knowledgebase.model.KBArticle getKBArticleByUrlTitle(
+		long groupId, java.lang.String urlTitle)
+		throws com.liferay.portal.kernel.exception.PortalException,
+			com.liferay.portal.kernel.exception.SystemException {
+		return getService().getKBArticleByUrlTitle(groupId, urlTitle);
+	}
+
 	public static java.util.List<com.liferay.knowledgebase.model.KBArticle> getKBArticles(
 		long[] resourcePrimKeys, int status,
 		com.liferay.portal.kernel.util.OrderByComparator orderByComparator)
@@ -505,6 +512,14 @@ public class KBArticleLocalServiceUtil {
 		throws com.liferay.portal.kernel.exception.PortalException,
 			com.liferay.portal.kernel.exception.SystemException {
 		return getService().getLatestKBArticle(resourcePrimKey, status);
+	}
+
+	public static com.liferay.knowledgebase.model.KBArticle getLatestKBArticleByUrlTitle(
+		long groupId, java.lang.String urlTitle, int status)
+		throws com.liferay.portal.kernel.exception.PortalException,
+			com.liferay.portal.kernel.exception.SystemException {
+		return getService()
+				   .getLatestKBArticleByUrlTitle(groupId, urlTitle, status);
 	}
 
 	public static java.util.List<com.liferay.knowledgebase.model.KBArticle> getSectionsKBArticles(

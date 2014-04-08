@@ -54,4 +54,9 @@
 		<implicit-parameter name="mvcPath">/display/history.jsp</implicit-parameter>
 		<implicit-parameter name="p_p_state">normal</implicit-parameter>
 	</route>
+	<route>
+		<pattern>/article/{urlTitle}</pattern>
+		<implicit-parameter name="mvcPath">/display/view_article.jsp</implicit-parameter>
+		<implicit-parameter name="p_p_state">normal</implicit-parameter>
+	</route>
 </routes>
