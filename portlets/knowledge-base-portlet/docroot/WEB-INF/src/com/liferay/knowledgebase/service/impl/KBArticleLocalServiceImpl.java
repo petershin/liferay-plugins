@@ -55,7 +55,6 @@ import com.liferay.portal.kernel.systemevent.SystemEventHierarchyEntryThreadLoca
 import com.liferay.portal.kernel.util.ArrayUtil;
 import com.liferay.portal.kernel.util.ContentTypes;
 import com.liferay.portal.kernel.util.FileUtil;
-import com.liferay.portal.kernel.util.FriendlyURLNormalizerUtil;
 import com.liferay.portal.kernel.util.ListUtil;
 import com.liferay.portal.kernel.util.OrderByComparator;
 import com.liferay.portal.kernel.util.ParamUtil;
@@ -69,7 +68,6 @@ import com.liferay.portal.kernel.workflow.WorkflowConstants;
 import com.liferay.portal.kernel.workflow.WorkflowHandlerRegistryUtil;
 import com.liferay.portal.model.CompanyConstants;
 import com.liferay.portal.model.Group;
-import com.liferay.portal.model.ModelHintsUtil;
 import com.liferay.portal.model.ResourceConstants;
 import com.liferay.portal.model.Subscription;
 import com.liferay.portal.model.Ticket;
@@ -94,7 +92,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import javax.portlet.PortletPreferences;
 
@@ -1477,6 +1474,43 @@ public class KBArticleLocalServiceImpl extends KBArticleLocalServiceBaseImpl {
 	}
 
 	protected String getUniqueUrlTitle(
+			long groupId, long kbArticleId, String title)
+		throws PortalException, SystemException {
+
+		String urlTitle = KnowledgeBaseUtil.getUrlTitle(kbArticleId, title);
+
+		for (int i = 1;; i++) {
+			KBArticle kbArticle = null;
+
+			try {
+				kbArticle = getKBArticleByUrlTitle(groupId, urlTitle);
+			}
+			catch (NoSuchArticleException nsae) {
+			}
+
+			if ((kbArticle == null) ||
+				(kbArticleId == kbArticle.getKbArticleId())) {
+
+				break;
+			}
+			else {
+				String suffix = StringPool.DASH + i;
+
+				String prefix = urlTitle;
+
+				if (urlTitle.length() > suffix.length()) {
+					prefix = urlTitle.substring(
+						0, urlTitle.length() - suffix.length());
+				}
+
+				urlTitle = prefix + suffix;
+			}
+		}
+
+		return urlTitle;
+	}
+
+	protected String getUniqueUrlTitle(
 			long kbArticleId, String title, String oldUrlTitle,
 			ServiceContext serviceContext)
 		throws PortalException, SystemException {
@@ -1487,13 +1521,15 @@ public class KBArticleLocalServiceImpl extends KBArticleLocalServiceBaseImpl {
 		String urlTitle = null;
 
 		if (Validator.isNotNull(serviceContextUrlTitle)) {
-			urlTitle = getUrlTitle(kbArticleId, serviceContextUrlTitle);
+			urlTitle = KnowledgeBaseUtil.getUrlTitle(
+				kbArticleId, serviceContextUrlTitle);
 		}
 		else if (Validator.isNotNull(oldUrlTitle)) {
 			return oldUrlTitle;
 		}
 		else {
-			urlTitle = getUrlTitle(kbArticleId, title);
+			urlTitle = getUniqueUrlTitle(
+				serviceContext.getScopeGroupId(), kbArticleId, title);
 		}
 
 		KBArticle urlTitleArticle = null;
@@ -1506,34 +1542,13 @@ public class KBArticleLocalServiceImpl extends KBArticleLocalServiceBaseImpl {
 		}
 
 		if ((urlTitleArticle != null) &&
-			!Validator.equals(
-				urlTitleArticle.getKbArticleId(), kbArticleId)) {
+			(kbArticleId != urlTitleArticle.getKbArticleId())) {
 
-			urlTitle = getUrlTitle(kbArticleId, title);
+			urlTitle = getUniqueUrlTitle(
+				serviceContext.getScopeGroupId(), kbArticleId, urlTitle);
 		}
 
 		return urlTitle;
-	}
-
-	protected String getUrlTitle(long id, String title) {
-		if (title == null) {
-			return String.valueOf(id);
-		}
-
-		title = StringUtil.toLowerCase(title.trim());
-
-		if (Validator.isNull(title) || Validator.isNumber(title) ||
-			title.equals("rss")) {
-
-			title = String.valueOf(id);
-		}
-		else {
-			title = FriendlyURLNormalizerUtil.normalize(
-				title, _friendlyURLPattern);
-		}
-
-		return ModelHintsUtil.trimString(
-			KBArticle.class.getName(), "urlTitle", title);
 	}
 
 	protected boolean isValidDirName(String dirName) throws SystemException {
@@ -1774,6 +1789,4 @@ public class KBArticleLocalServiceImpl extends KBArticleLocalServiceBaseImpl {
 
 	private static Log _log = LogFactoryUtil.getLog(
 		KBArticleLocalServiceImpl.class);
-
-	private static Pattern _friendlyURLPattern = Pattern.compile("[^a-z0-9_-]");
 }
