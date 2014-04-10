@@ -161,13 +161,6 @@ public class KBArticleServiceUtil {
 			status, orderByComparator);
 	}
 
-	public static com.liferay.knowledgebase.model.KBArticle getKBArticleByUrlTitle(
-		long groupId, java.lang.String urlTitle)
-		throws com.liferay.portal.kernel.exception.PortalException,
-			com.liferay.portal.kernel.exception.SystemException {
-		return getService().getKBArticleByUrlTitle(groupId, urlTitle);
-	}
-
 	public static java.lang.String getKBArticleRSS(long resourcePrimKey,
 		int status, int rssDelta, java.lang.String rssDisplayStyle,
 		java.lang.String rssFormat,
