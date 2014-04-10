@@ -266,15 +266,6 @@ public class KBArticleServiceImpl extends KBArticleServiceBaseImpl {
 		return Collections.unmodifiableList(kbArticles);
 	}
 
-	public KBArticle getKBArticleByUrlTitle(long groupId, String urlTitle)
-		throws PortalException, SystemException {
-
-		KBArticle kbArticle = kbArticleLocalService.getKBArticleByUrlTitle(
-			groupId, urlTitle);
-
-		return kbArticle;
-	}
-
 	public String getKBArticleRSS(
 			long resourcePrimKey, int status, int rssDelta,
 			String rssDisplayStyle, String rssFormat, ThemeDisplay themeDisplay)
