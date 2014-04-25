@@ -76,6 +76,10 @@ public class SyncEngine {
 		watcher.close();
 	}
 
+	public static boolean isRunning() {
+		return _running;
+	}
+
 	public static void scheduleSyncAccountTasks(long syncAccountId)
 		throws Exception {
 
@@ -148,10 +152,10 @@ public class SyncEngine {
 			return;
 		}
 
+		_running = true;
+
 		try {
 			doStart();
-
-			_running = true;
 		}
 		catch (Exception e) {
 			_logger.error(e.getMessage(), e);
@@ -163,10 +167,10 @@ public class SyncEngine {
 			return;
 		}
 
+		_running = false;
+
 		try {
 			doStop();
-
-			_running = false;
 		}
 		catch (Exception e) {
 			_logger.error(e.getMessage(), e);
@@ -179,7 +183,7 @@ public class SyncEngine {
 
 		LoggerUtil.initLogger();
 
-		_logger.info("Starting " + PropsValues.SYNC_PRODUCT_NAME);
+		_logger.info("Starting {}", PropsValues.SYNC_PRODUCT_NAME);
 
 		UpgradeUtil.upgrade();
 
@@ -217,6 +221,8 @@ public class SyncEngine {
 	protected static void doStop() throws Exception {
 		SyncEngineUtil.fireSyncEngineStateChanged(
 			SyncEngineUtil.SYNC_ENGINE_STATE_STOPPING);
+
+		_logger.info("Stopping {}", PropsValues.SYNC_PRODUCT_NAME);
 
 		for (long syncAccountId : _syncAccountTasks.keySet()) {
 			cancelSyncAccountTasks(syncAccountId);
